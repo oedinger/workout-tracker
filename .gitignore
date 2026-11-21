@@ -1,0 +1,3 @@
+.sync-secret
+__pycache__/
+*.bak-*

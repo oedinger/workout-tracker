@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<title>יומן אימונים</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    line-height: 1.55;
+    background: #f4f1ec;
+    color: #1c1a17;
+    -webkit-font-smoothing: antialiased;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #16140f; color: #f2ede3; }
+  }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 20px 16px 48px; width: 100%; }
+  header { margin-bottom: 18px; }
+  h1 { font-size: 32px; line-height: 1.15; margin: 0 0 4px; }
+  .sub { color: #57534a; font-size: 15px; margin: 0; }
+  @media (prefers-color-scheme: dark) { .sub { color: #b3ab9c; } }
+  h2 { font-size: 20px; margin: 0 0 10px; }
+  section { margin-bottom: 22px; }
+  .card {
+    background: #fffdf9;
+    border: 1px solid #d9d2c4;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+    min-width: 0;
+  }
+  @media (prefers-color-scheme: dark) {
+    .card { background: #201d17; border-color: #3a352b; }
+  }
+  .card .date { color: #57534a; font-size: 14px; }
+  @media (prefers-color-scheme: dark) { .card .date { color: #b3ab9c; } }
+  .badge {
+    display: inline-block;
+    background: #fbe9dd;
+    color: #c2410c;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+  }
+  .next-letter { font-size: 26px; font-weight: 800; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 8px 0; border-top: 1px solid #d9d2c4; vertical-align: baseline; }
+  tr:first-child td { border-top: none; }
+  @media (prefers-color-scheme: dark) { td { border-top-color: #3a352b; } }
+  td.ex { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+  td.ex .note { display: block; font-weight: 400; font-size: 13px; color: #57534a; }
+  @media (prefers-color-scheme: dark) { td.ex .note { color: #b3ab9c; } }
+  td.wt {
+    text-align: left;
+    font-weight: 700;
+    font-size: 17px;
+    white-space: nowrap;
+    padding-inline-start: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  td.wt .unit { font-size: 12px; font-weight: 500; color: #57534a; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 420px) { .cards { grid-template-columns: 1fr; } }
+  .letter-card h3 { margin: 0 0 2px; font-size: 20px; }
+  .letter-card .date { display: block; margin-bottom: 6px; }
+  .muted { color: #57534a; font-size: 14px; }
+  @media (prefers-color-scheme: dark) { .muted { color: #b3ab9c; } }
+  .bar-row { display: flex; align-items: baseline; gap: 8px; margin: 6px 0; min-width: 0; }
+  .bar-row .lbl { flex: 0 0 auto; font-size: 14px; color: #57534a; }
+  .bar-track { flex: 1 1 auto; min-width: 0; height: 12px; background: #ece7dd; border-radius: 999px; overflow: hidden; }
+  .bar-fill { height: 100%; background: #c2410c; border-radius: 999px; }
+  .bar-val { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #status { color: #57534a; }
+  footer { color: #57534a; font-size: 13px; margin-top: 8px; }
+  @media (prefers-color-scheme: dark) { footer, #status { color: #b3ab9c; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <h1>יומן אימונים</h1>
+    <p class="sub">THE WORKSHOP Strength Club · שני וחמישי 08:00 · אימונים A ו־C לסירוגין</p>
+  </header>
+
+  <p id="status" role="status">טוען אימונים…</p>
+
+  <section id="next-section" hidden>
+    <h2>האימון הבא</h2>
+    <div class="card" id="next-card"></div>
+  </section>
+
+  <section id="letters-section" hidden>
+    <h2>משקלים אחרונים לפי אימון</h2>
+    <div class="cards" id="letters"></div>
+  </section>
+
+  <section id="deadlift-section" hidden>
+    <h2>התקדמות — דדליפט</h2>
+    <div class="card" id="deadlift"></div>
+  </section>
+
+  <section id="history-section" hidden>
+    <h2>היסטוריה</h2>
+    <div id="history"></div>
+  </section>
+
+  <footer id="updated"></footer>
+</main>
+
+<script>
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function fmtDate(iso) {
+  if (!iso) return '';
+  var parts = iso.split('-');
+  if (parts.length !== 3) return esc(iso);
+  return parts[2] + '/' + parts[1] + '/' + parts[0];
+}
+function weekdayHe(iso) {
+  try {
+    var d = new Date(iso + 'T12:00:00');
+    return ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'][d.getDay()];
+  } catch (e) { return ''; }
+}
+function loadText(ex) {
+  var bits = [];
+  if (ex.load != null && ex.load !== '') bits.push(esc(ex.load) + ' <span class="unit">ק״ג</span>');
+  if (ex.reps != null && ex.reps !== '') bits.push('×' + esc(ex.reps));
+  if (ex.sets != null && ex.sets !== '') bits.push(esc(ex.sets) + ' סטים');
+  return bits.join(' · ') || '—';
+}
+function exerciseRows(exercises) {
+  return (exercises || []).map(function (ex) {
+    var note = ex.note ? '<span class="note">' + esc(ex.note) + '</span>' : '';
+    return '<tr><td class="ex">' + esc(ex.name) + note + '</td>' +
+      '<td class="wt">' + loadText(ex) + '</td></tr>';
+  }).join('');
+}
+function workoutCard(w, badgeText) {
+  var badge = badgeText ? '<span class="badge">' + esc(badgeText) + '</span>' : '';
+  return badge +
+    '<div class="date">אימון ' + esc(w.letter) + ' · ' + esc(weekdayHe(w.date)) + ' ' + fmtDate(w.date) + '</div>' +
+    '<table>' + exerciseRows(w.exercises) + '</table>';
+}
+
+async function main() {
+  var status = document.getElementById('status');
+  var data;
+  try {
+    var res = await fetch('/api/workouts');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    data = await res.json();
+  } catch (e) {
+    status.textContent = 'לא הצלחתי לטעון את האימונים. נסה לרענן.';
+    return;
+  }
+  var workouts = data.workouts || [];
+  if (!workouts.length) {
+    status.textContent = 'אין עדיין אימונים מתועדים. שלח אימון אחרי האימון הבא והוא יופיע כאן.';
+    return;
+  }
+  status.hidden = true;
+
+  // Next workout: opposite letter of the newest logged workout.
+  var last = workouts[0];
+  var nextLetter = last.letter === 'A' ? 'C' : 'A';
+  var prevSame = (data.last_by_letter && data.last_by_letter[nextLetter]) || null;
+  var nextCard = document.getElementById('next-card');
+  if (prevSame) {
+    nextCard.innerHTML = '<div class="next-letter">אימון ' + esc(nextLetter) + '</div>' +
+      '<p class="muted">פעם קודמת — ' + esc(weekdayHe(prevSame.date)) + ' ' + fmtDate(prevSame.date) + ':</p>' +
+      '<table>' + exerciseRows(prevSame.exercises) + '</table>';
+  } else {
+    nextCard.innerHTML = '<div class="next-letter">אימון ' + esc(nextLetter) + '</div>' +
+      '<p class="muted">אין עדיין אימון ' + esc(nextLetter) + ' מתועד — זו תהיה הפעם הראשונה.</p>';
+  }
+  document.getElementById('next-section').hidden = false;
+
+  // Last weights per letter.
+  var lettersEl = document.getElementById('letters');
+  ['A', 'C'].forEach(function (letter) {
+    var w = data.last_by_letter && data.last_by_letter[letter];
+    var div = document.createElement('div');
+    div.className = 'card letter-card';
+    div.innerHTML = w
+      ? '<h3>אימון ' + esc(letter) + '</h3><span class="date">' + esc(weekdayHe(w.date)) + ' ' + fmtDate(w.date) + '</span>' +
+        '<table>' + exerciseRows(w.exercises) + '</table>'
+      : '<h3>אימון ' + esc(letter) + '</h3><p class="muted">עדיין לא תועד.</p>';
+    lettersEl.appendChild(div);
+  });
+  document.getElementById('letters-section').hidden = false;
+
+  // Deadlift progress (only workouts that logged a deadlift load).
+  var dl = workouts
+    .filter(function (w) {
+      return (w.exercises || []).some(function (ex) { return ex.name === 'דדליפט' && ex.load != null; });
+    })
+    .map(function (w) {
+      var ex = w.exercises.find(function (e) { return e.name === 'דדליפט'; });
+      return { date: w.date, letter: w.letter, load: ex.load };
+    })
+    .sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+  if (dl.length) {
+    var max = Math.max.apply(null, dl.map(function (d) { return d.load; }));
+    var first = dl[0].load, lastDl = dl[dl.length - 1].load;
+    var delta = Math.round((lastDl - first) * 10) / 10;
+    var html = '<p class="muted">' + esc(first) + ' ← ' + esc(lastDl) + ' ק״ג' +
+      (dl.length > 1 ? ' (' + (delta >= 0 ? '+' : '') + esc(delta) + ' ק״ג)' : '') + '</p>';
+    html += dl.map(function (d) {
+      var pct = max > 0 ? Math.round((d.load / max) * 100) : 0;
+      return '<div class="bar-row"><span class="lbl">אימון ' + esc(d.letter) + ' · ' + fmtDate(d.date) + '</span>' +
+        '<span class="bar-track"><span class="bar-fill" style="display:block;width:' + pct + '%"></span></span>' +
+        '<span class="bar-val">' + esc(d.load) + '</span></div>';
+    }).join('');
+    document.getElementById('deadlift').innerHTML = html;
+    document.getElementById('deadlift-section').hidden = false;
+  }
+
+  // Full history, newest first.
+  var histEl = document.getElementById('history');
+  workouts.forEach(function (w, i) {
+    var div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = workoutCard(w, i === 0 ? 'האימון האחרון' : '');
+    histEl.appendChild(div);
+  });
+  document.getElementById('history-section').hidden = false;
+
+  if (data.meta && data.meta.updated) {
+    document.getElementById('updated').textContent = 'עודכן: ' + data.meta.updated;
+  }
+}
+main();
+</script>
+</body>
+</html>
