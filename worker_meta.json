@@ -1,1 +1,10 @@
-{"bindings":[{"name":"WORKOUT_KV","namespace_id":"REPLACE_ME","type":"kv_namespace"}],"main_module":"worker.js"}
+{
+  "bindings": [
+    {
+      "name": "WORKOUT_KV",
+      "namespace_id": "79865cd6b34148f6a616a15cbb55942d",
+      "type": "kv_namespace"
+    }
+  ],
+  "main_module": "worker.js"
+}
