@@ -49,22 +49,6 @@
     margin-bottom: 8px;
   }
   .next-letter { font-size: 26px; font-weight: 800; }
-  table { width: 100%; border-collapse: collapse; }
-  td { padding: 8px 0; border-top: 1px solid #d9d2c4; vertical-align: baseline; }
-  tr:first-child td { border-top: none; }
-  @media (prefers-color-scheme: dark) { td { border-top-color: #3a352b; } }
-  td.ex { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
-  td.ex .note { display: block; font-weight: 400; font-size: 13px; color: #57534a; }
-  @media (prefers-color-scheme: dark) { td.ex .note { color: #b3ab9c; } }
-  td.wt {
-    text-align: left;
-    font-weight: 700;
-    font-size: 17px;
-    white-space: nowrap;
-    padding-inline-start: 10px;
-    font-variant-numeric: tabular-nums;
-  }
-  td.wt .unit { font-size: 12px; font-weight: 500; color: #57534a; }
   .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 420px) { .cards { grid-template-columns: 1fr; } }
   .letter-card h3 { margin: 0 0 2px; font-size: 20px; }
@@ -81,6 +65,19 @@
   .obs { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; color: #57534a; }
   .obs li { padding: 1px 0; }
   @media (prefers-color-scheme: dark) { .obs { color: #b3ab9c; } }
+  /* One exercise inside a workout card: name + load, then its own history graph. */
+  .ex-block { padding: 10px 0; border-top: 1px solid #d9d2c4; min-width: 0; }
+  .ex-block:first-child { border-top: none; padding-top: 2px; }
+  @media (prefers-color-scheme: dark) { .ex-block { border-top-color: #3a352b; } }
+  .ex-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .ex-name { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+  .ex-name .note { display: block; font-weight: 400; font-size: 13px; color: #57534a; }
+  @media (prefers-color-scheme: dark) { .ex-name .note { color: #b3ab9c; } }
+  .ex-load { font-weight: 700; font-size: 17px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ex-load .unit { font-size: 12px; font-weight: 500; color: #57534a; }
+  .ex-delta { font-size: 13px; color: #57534a; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  @media (prefers-color-scheme: dark) { .ex-delta { color: #b3ab9c; } }
+  .chart.mini { margin: 4px 0 0; }
   #status { color: #57534a; }
   footer { color: #57534a; font-size: 13px; margin-top: 8px; }
   @media (prefers-color-scheme: dark) { footer, #status { color: #b3ab9c; } }
@@ -106,7 +103,7 @@
   </section>
 
   <section id="progress-section" hidden>
-    <h2>התקדמות לפי תרגיל</h2>
+    <h2>התקדמות לפי תרגיל ואימון</h2>
     <div id="progress"></div>
   </section>
 
@@ -127,6 +124,9 @@
 // Official exercise names from THE WORKSHOP program sheet (23/11/2026).
 // Oren does only workouts A and C (no B). Stored workout data may use the
 // old Hebrew names — canonKey() normalises both to the same exercise.
+// KEY RULE: an exercise belongs to a specific workout letter. Deadlift in A
+// and Deadlift in C are DIFFERENT histories — every graph is keyed by
+// (letter, exercise), never by exercise alone.
 var EXERCISES = {
   'back-squat':  { name: 'Back Squat',     he: 'בק סקוואט' },
   'pull-ups':    { name: 'Pull Ups',       he: 'פול אפס' },
@@ -156,6 +156,13 @@ function canonKey(name) {
   if (!name) return null;
   return NAME_TO_KEY[String(name).trim().toLowerCase()] || null;
 }
+// History key: letter + exercise. Same exercise name in another letter
+// is a different series.
+function histKey(letter, ex) {
+  var k = canonKey(ex.name);
+  if (!k) k = 'raw:' + String(ex.name).trim().toLowerCase();
+  return letter + '|' + k;
+}
 function displayName(ex) {
   var k = canonKey(ex.name);
   return k ? EXERCISES[k].name : ex.name;
@@ -163,6 +170,16 @@ function displayName(ex) {
 function hebrewName(ex) {
   var k = canonKey(ex.name);
   return k ? EXERCISES[k].he : '';
+}
+function keyLabel(k) {
+  if (k.indexOf('raw:') === 0) return k.slice(4);
+  var def = EXERCISES[k];
+  return def ? def.name : k;
+}
+function keyHebrew(k) {
+  if (k.indexOf('raw:') === 0) return '';
+  var def = EXERCISES[k];
+  return def ? def.he : '';
 }
 
 function esc(s) {
@@ -198,23 +215,6 @@ function loadText(ex) {
   if (ex.sets != null && ex.sets !== '') bits.push(esc(ex.sets) + ' סטים');
   return bits.join(' · ') || '—';
 }
-function exerciseRows(exercises) {
-  return (exercises || []).map(function (ex) {
-    var subs = [];
-    var he = hebrewName(ex);
-    if (he) subs.push(he);
-    if (ex.note) subs.push(ex.note);
-    var note = subs.length ? '<span class="note">' + subs.map(esc).join(' · ') + '</span>' : '';
-    return '<tr><td class="ex"><span dir="ltr">' + esc(displayName(ex)) + '</span>' + note + '</td>' +
-      '<td class="wt">' + loadText(ex) + '</td></tr>';
-  }).join('');
-}
-function workoutCard(w, badgeText) {
-  var badge = badgeText ? '<span class="badge">' + esc(badgeText) + '</span>' : '';
-  return badge +
-    '<div class="date">אימון ' + esc(w.letter) + ' · ' + esc(weekdayHe(w.date)) + ' ' + fmtDate(w.date) + '</div>' +
-    '<table>' + exerciseRows(w.exercises) + '</table>';
-}
 // Numeric value of one logged exercise: load (kg) if present, else reps.
 function exValue(ex) {
   if (ex.load != null && ex.load !== '') return { v: Number(ex.load), unit: 'kg' };
@@ -222,14 +222,17 @@ function exValue(ex) {
   return null;
 }
 function unitLabel(unit) { return unit === 'kg' ? 'ק״ג' : 'חזרות'; }
-function chartSVG(points) {
-  var W = 300, H = 96, PL = 10, PR = 10, PT = 22, PB = 22;
+function chartSVG(points, opts) {
+  opts = opts || {};
+  var W = 300, H = opts.small ? 72 : 96, PL = 18, PR = 18, PT = 20, PB = 20;
   var vals = points.map(function (p) { return p.v; });
   var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
   if (min === max) { min -= 1; max += 1; }
   var pad = (max - min) * 0.2; min -= pad; max += pad;
   function x(i) { return points.length === 1 ? W / 2 : PL + (W - PL - PR) * (i / (points.length - 1)); }
   function y(v) { return PT + (H - PT - PB) * (1 - (v - min) / (max - min)); }
+  // First/last labels anchor inward so "16/11" is not clipped at the edge.
+  function anchor(i) { return points.length === 1 ? 'middle' : (i === 0 ? 'start' : (i === points.length - 1 ? 'end' : 'middle')); }
   var line = points.map(function (p, i) {
     return (i === 0 ? 'M' : 'L') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1);
   }).join(' ');
@@ -237,14 +240,59 @@ function chartSVG(points) {
     return '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="4" fill="#c2410c"/>';
   }).join('');
   var labels = points.map(function (p, i) {
-    return '<text x="' + x(i).toFixed(1) + '" y="' + (y(p.v) - 8).toFixed(1) + '" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">' + esc(fmtNum(p.v)) + '</text>';
+    return '<text x="' + x(i).toFixed(1) + '" y="' + (y(p.v) - 8).toFixed(1) + '" text-anchor="' + anchor(i) + '" font-size="12" font-weight="700" fill="currentColor">' + esc(fmtNum(p.v)) + '</text>';
   }).join('');
   var dates = points.map(function (p, i) {
-    return '<text x="' + x(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.7">' + fmtDateShort(p.date) + '</text>';
+    return '<text x="' + x(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + anchor(i) + '" font-size="11" fill="currentColor" opacity="0.7">' + fmtDateShort(p.date) + '</text>';
   }).join('');
-  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="גרף התקדמות">' +
+  return '<svg class="chart' + (opts.small ? ' mini' : '') + '" direction="ltr" viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="גרף התקדמות">' +
     '<path d="' + line + '" fill="none" stroke="#c2410c" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' +
     dots + labels + dates + '</svg>';
+}
+// One exercise inside a workout card: name + this workout's load, then
+// the history graph of THIS exercise in THIS letter only.
+function exerciseBlock(ex, letter, hist) {
+  var obs = hist[histKey(letter, ex)] || [];
+  var numeric = obs.filter(function (o) { return o.val; });
+  var subs = [];
+  var he = hebrewName(ex);
+  if (he) subs.push(he);
+  if (ex.note) subs.push(ex.note);
+  var html = '<div class="ex-block"><div class="ex-head">' +
+    '<span class="ex-name"><span dir="ltr">' + esc(displayName(ex)) + '</span>' +
+    (subs.length ? '<span class="note">' + subs.map(esc).join(' · ') + '</span>' : '') + '</span>' +
+    '<span class="ex-load">' + loadText(ex) + '</span></div>';
+  if (numeric.length) {
+    html += chartSVG(numeric.map(function (o) { return { date: o.date, v: o.val.v }; }), { small: true });
+    if (numeric.length > 1) {
+      var first = numeric[0].val.v, lastV = numeric[numeric.length - 1].val.v;
+      var delta = Math.round((lastV - first) * 10) / 10;
+      html += '<div class="ex-delta">' + esc(fmtNum(first)) + ' ← ' + esc(fmtNum(lastV)) + ' ' + esc(unitLabel(numeric[0].val.unit)) +
+        ' (' + (delta >= 0 ? '+' : '') + esc(fmtNum(delta)) + ')</div>';
+    }
+  }
+  return html + '</div>';
+}
+function workoutCard(w, hist, badgeText, showDate) {
+  var badge = badgeText ? '<span class="badge">' + esc(badgeText) + '</span>' : '';
+  var dateLine = showDate === false ? '' :
+    '<div class="date">אימון ' + esc(w.letter) + ' · ' + esc(weekdayHe(w.date)) + ' ' + fmtDate(w.date) + '</div>';
+  return badge + dateLine +
+    (w.exercises || []).map(function (ex) { return exerciseBlock(ex, w.letter, hist); }).join('');
+}
+// All logged observations grouped by (letter, exercise), oldest first.
+function buildHist(workouts) {
+  var h = {};
+  workouts.forEach(function (w) {
+    (w.exercises || []).forEach(function (ex) {
+      var k = histKey(w.letter, ex);
+      (h[k] = h[k] || []).push({ date: w.date, letter: w.letter, val: exValue(ex), note: ex.note || '' });
+    });
+  });
+  Object.keys(h).forEach(function (k) {
+    h[k].sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+  });
+  return h;
 }
 
 async function main() {
@@ -264,10 +312,11 @@ async function main() {
     return;
   }
   status.hidden = true;
+  var hist = buildHist(workouts);
 
-  // Last workout only, with its latest weights.
+  // Last workout only, with its latest weights + per-exercise graphs.
   var last = workouts[0];
-  document.getElementById('last-card').innerHTML = workoutCard(last, null);
+  document.getElementById('last-card').innerHTML = workoutCard(last, hist, null);
   document.getElementById('last-section').hidden = false;
 
   // Next workout: opposite letter of the newest logged workout.
@@ -277,62 +326,56 @@ async function main() {
   if (prevSame) {
     nextCard.innerHTML = '<div class="next-letter">אימון ' + esc(nextLetter) + '</div>' +
       '<p class="muted">פעם קודמת — ' + esc(weekdayHe(prevSame.date)) + ' ' + fmtDate(prevSame.date) + ':</p>' +
-      '<table>' + exerciseRows(prevSame.exercises) + '</table>';
+      workoutCard(prevSame, hist, null, false);
   } else {
     nextCard.innerHTML = '<div class="next-letter">אימון ' + esc(nextLetter) + '</div>' +
       '<p class="muted">אין עדיין אימון ' + esc(nextLetter) + ' מתועד — זו תהיה הפעם הראשונה.</p>';
   }
   document.getElementById('next-section').hidden = false;
 
-  // Per-exercise history + progress (all logged workouts, by date).
-  var byKey = {};
-  workouts.forEach(function (w) {
-    (w.exercises || []).forEach(function (ex) {
-      var k = canonKey(ex.name);
-      if (!k) return;
-      (byKey[k] = byKey[k] || []).push({ date: w.date, letter: w.letter, val: exValue(ex), note: ex.note || '' });
-    });
-  });
-  Object.keys(byKey).forEach(function (k) {
-    byKey[k].sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-  });
+  // Progress, split by (letter, exercise): Deadlift in A and Deadlift in C
+  // are separate cards with separate graphs.
   var progEl = document.getElementById('progress');
-  PROGRAM_ORDER.forEach(function (k) {
-    var obs = byKey[k];
-    var def = EXERCISES[k];
-    var div = document.createElement('div');
-    div.className = 'card prog-card';
-    var title = '<h3><span dir="ltr">' + esc(def.name) + '</span>' +
-      (def.he ? ' <span class="he">· ' + esc(def.he) + '</span>' : '') + '</h3>';
-    if (!obs || !obs.length) {
-      div.innerHTML = title + '<p class="muted">עדיין לא תועד באימון.</p>';
+  ['A', 'C', 'B'].forEach(function (letter) {
+    var keys = Object.keys(hist)
+      .filter(function (k) { return k.indexOf(letter + '|') === 0; })
+      .map(function (k) { return k.slice(2); });
+    keys.sort(function (a, b) {
+      var ia = PROGRAM_ORDER.indexOf(a), ib = PROGRAM_ORDER.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+    keys.forEach(function (k) {
+      var obs = hist[letter + '|' + k];
+      var div = document.createElement('div');
+      div.className = 'card prog-card';
+      var he = keyHebrew(k);
+      var title = '<h3><span dir="ltr">' + esc(keyLabel(k)) + '</span> · אימון ' + esc(letter) +
+        (he ? ' <span class="he">· ' + esc(he) + '</span>' : '') + '</h3>';
+      var numeric = obs.filter(function (o) { return o.val; });
+      var html = title;
+      if (numeric.length) {
+        var unit = numeric[0].val.unit;
+        var first = numeric[0].val.v, lastV = numeric[numeric.length - 1].val.v;
+        var delta = Math.round((lastV - first) * 10) / 10;
+        html += '<p class="prog-line">' + esc(fmtNum(first)) + ' ← ' + esc(fmtNum(lastV)) + ' ' + esc(unitLabel(unit)) +
+          (numeric.length > 1 ? ' <span class="delta">(' + (delta >= 0 ? '+' : '') + esc(fmtNum(delta)) + ')</span>' : '') + '</p>';
+        html += chartSVG(numeric.map(function (o) { return { date: o.date, v: o.val.v }; }));
+      }
+      html += '<ul class="obs">' + obs.map(function (o) {
+        var valTxt = o.val
+          ? (o.val.unit === 'kg' ? esc(fmtNum(o.val.v)) + ' ק״ג' : '×' + esc(fmtNum(o.val.v)))
+          : '—';
+        var bits = [fmtDate(o.date) + ' · אימון ' + esc(o.letter) + ' — ' + valTxt];
+        if (o.note) bits.push(esc(o.note));
+        return '<li>' + bits.join(' · ') + '</li>';
+      }).join('') + '</ul>';
+      div.innerHTML = html;
       progEl.appendChild(div);
-      return;
-    }
-    var numeric = obs.filter(function (o) { return o.val; });
-    var html = title;
-    if (numeric.length) {
-      var unit = numeric[0].val.unit;
-      var first = numeric[0].val.v, lastV = numeric[numeric.length - 1].val.v;
-      var delta = Math.round((lastV - first) * 10) / 10;
-      html += '<p class="prog-line">' + esc(fmtNum(first)) + ' ← ' + esc(fmtNum(lastV)) + ' ' + esc(unitLabel(unit)) +
-        (numeric.length > 1 ? ' <span class="delta">(' + (delta >= 0 ? '+' : '') + esc(fmtNum(delta)) + ')</span>' : '') + '</p>';
-      html += chartSVG(numeric.map(function (o) { return { date: o.date, v: o.val.v }; }));
-    }
-    html += '<ul class="obs">' + obs.map(function (o) {
-      var valTxt = o.val
-        ? (o.val.unit === 'kg' ? esc(fmtNum(o.val.v)) + ' ק״ג' : '×' + esc(fmtNum(o.val.v)))
-        : '—';
-      var bits = [fmtDate(o.date) + ' · אימון ' + esc(o.letter) + ' — ' + valTxt];
-      if (o.note) bits.push(esc(o.note));
-      return '<li>' + bits.join(' · ') + '</li>';
-    }).join('') + '</ul>';
-    div.innerHTML = html;
-    progEl.appendChild(div);
+    });
   });
   document.getElementById('progress-section').hidden = false;
 
-  // Last weights per letter.
+  // Last weights per letter, with per-exercise graphs.
   var lettersEl = document.getElementById('letters');
   ['A', 'C'].forEach(function (letter) {
     var w = data.last_by_letter && data.last_by_letter[letter];
@@ -340,18 +383,18 @@ async function main() {
     div.className = 'card letter-card';
     div.innerHTML = w
       ? '<h3>אימון ' + esc(letter) + '</h3><span class="date">' + esc(weekdayHe(w.date)) + ' ' + fmtDate(w.date) + '</span>' +
-        '<table>' + exerciseRows(w.exercises) + '</table>'
+        workoutCard(w, hist, null, false)
       : '<h3>אימון ' + esc(letter) + '</h3><p class="muted">עדיין לא תועד.</p>';
     lettersEl.appendChild(div);
   });
   document.getElementById('letters-section').hidden = false;
 
-  // Full history, newest first.
+  // Full history, newest first — each card carries its exercises' graphs.
   var histEl = document.getElementById('history');
   workouts.forEach(function (w) {
     var div = document.createElement('div');
     div.className = 'card';
-    div.innerHTML = workoutCard(w, null);
+    div.innerHTML = workoutCard(w, hist, null);
     histEl.appendChild(div);
   });
   document.getElementById('history-section').hidden = false;
