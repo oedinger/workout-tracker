@@ -71,11 +71,16 @@
   .letter-card .date { display: block; margin-bottom: 6px; }
   .muted { color: #57534a; font-size: 14px; }
   @media (prefers-color-scheme: dark) { .muted { color: #b3ab9c; } }
-  .bar-row { display: flex; align-items: baseline; gap: 8px; margin: 6px 0; min-width: 0; }
-  .bar-row .lbl { flex: 0 0 auto; font-size: 14px; color: #57534a; }
-  .bar-track { flex: 1 1 auto; min-width: 0; height: 12px; background: #ece7dd; border-radius: 999px; overflow: hidden; }
-  .bar-fill { height: 100%; background: #c2410c; border-radius: 999px; }
-  .bar-val { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .prog-card h3 { margin: 0 0 2px; font-size: 19px; }
+  .prog-card h3 .he { font-weight: 400; font-size: 14px; color: #57534a; }
+  @media (prefers-color-scheme: dark) { .prog-card h3 .he { color: #b3ab9c; } }
+  .prog-line { font-weight: 700; font-size: 15px; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+  .prog-line .delta { color: #c2410c; }
+  .chart { margin: 6px 0 2px; color: #1c1a17; }
+  @media (prefers-color-scheme: dark) { .chart { color: #f2ede3; } }
+  .obs { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; color: #57534a; }
+  .obs li { padding: 1px 0; }
+  @media (prefers-color-scheme: dark) { .obs { color: #b3ab9c; } }
   #status { color: #57534a; }
   footer { color: #57534a; font-size: 13px; margin-top: 8px; }
   @media (prefers-color-scheme: dark) { footer, #status { color: #b3ab9c; } }
@@ -90,19 +95,24 @@
 
   <p id="status" role="status">טוען אימונים…</p>
 
+  <section id="last-section" hidden>
+    <h2>האימון האחרון</h2>
+    <div class="card" id="last-card"></div>
+  </section>
+
   <section id="next-section" hidden>
     <h2>האימון הבא</h2>
     <div class="card" id="next-card"></div>
   </section>
 
+  <section id="progress-section" hidden>
+    <h2>התקדמות לפי תרגיל</h2>
+    <div id="progress"></div>
+  </section>
+
   <section id="letters-section" hidden>
     <h2>משקלים אחרונים לפי אימון</h2>
     <div class="cards" id="letters"></div>
-  </section>
-
-  <section id="deadlift-section" hidden>
-    <h2>התקדמות — דדליפט</h2>
-    <div class="card" id="deadlift"></div>
   </section>
 
   <section id="history-section" hidden>
@@ -114,16 +124,66 @@
 </main>
 
 <script>
+// Official exercise names from THE WORKSHOP program sheet (23/11/2026).
+// Oren does only workouts A and C (no B). Stored workout data may use the
+// old Hebrew names — canonKey() normalises both to the same exercise.
+var EXERCISES = {
+  'back-squat':  { name: 'Back Squat',     he: 'בק סקוואט' },
+  'pull-ups':    { name: 'Pull Ups',       he: 'פול אפס' },
+  'deadlift':    { name: 'Deadlift',       he: 'דדליפט' },
+  'dips':        { name: 'Dips',           he: 'דיפס' },
+  'goblet-squat':{ name: 'Goblet Squat',   he: 'גובלט סקוואט' },
+  'bench-press': { name: 'Bench Press',    he: 'חזה' },
+  'dar-lunges':  { name: 'D.A.R Lunges',   he: '' },
+  'double-kb-row':{ name: 'Double KB Row', he: 'חתירה' },
+  'kb-swing':    { name: 'KB Swing',       he: 'סוויפט' }
+};
+// Program order on the sheet: A first, then C (B is not done).
+var PROGRAM_ORDER = ['back-squat', 'pull-ups', 'deadlift', 'dips', 'goblet-squat',
+                     'bench-press', 'dar-lunges', 'double-kb-row', 'kb-swing'];
+var NAME_TO_KEY = {
+  'back squat': 'back-squat', 'בק סקוואט': 'back-squat', 'סקוואט': 'back-squat',
+  'pull ups': 'pull-ups', 'פול אפס': 'pull-ups',
+  'deadlift': 'deadlift', 'דדליפט': 'deadlift',
+  'dips': 'dips', 'דיפס': 'dips',
+  'goblet squat': 'goblet-squat', 'גובלט סקוואט': 'goblet-squat',
+  'bench press': 'bench-press', 'חזה': 'bench-press',
+  'd.a.r lunges': 'dar-lunges',
+  'double kb row': 'double-kb-row', 'חתירה': 'double-kb-row',
+  'kb swing': 'kb-swing', 'סוויפט': 'kb-swing'
+};
+function canonKey(name) {
+  if (!name) return null;
+  return NAME_TO_KEY[String(name).trim().toLowerCase()] || null;
+}
+function displayName(ex) {
+  var k = canonKey(ex.name);
+  return k ? EXERCISES[k].name : ex.name;
+}
+function hebrewName(ex) {
+  var k = canonKey(ex.name);
+  return k ? EXERCISES[k].he : '';
+}
+
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
   });
+}
+function fmtNum(v) {
+  return String(Math.round(v * 10) / 10);
 }
 function fmtDate(iso) {
   if (!iso) return '';
   var parts = iso.split('-');
   if (parts.length !== 3) return esc(iso);
   return parts[2] + '/' + parts[1] + '/' + parts[0];
+}
+function fmtDateShort(iso) {
+  if (!iso) return '';
+  var parts = iso.split('-');
+  if (parts.length !== 3) return esc(iso);
+  return parts[2] + '/' + parts[1];
 }
 function weekdayHe(iso) {
   try {
@@ -133,15 +193,19 @@ function weekdayHe(iso) {
 }
 function loadText(ex) {
   var bits = [];
-  if (ex.load != null && ex.load !== '') bits.push(esc(ex.load) + ' <span class="unit">ק״ג</span>');
-  if (ex.reps != null && ex.reps !== '') bits.push('×' + esc(ex.reps));
+  if (ex.load != null && ex.load !== '') bits.push(esc(fmtNum(ex.load)) + ' <span class="unit">ק״ג</span>');
+  if (ex.reps != null && ex.reps !== '') bits.push('×' + esc(fmtNum(ex.reps)));
   if (ex.sets != null && ex.sets !== '') bits.push(esc(ex.sets) + ' סטים');
   return bits.join(' · ') || '—';
 }
 function exerciseRows(exercises) {
   return (exercises || []).map(function (ex) {
-    var note = ex.note ? '<span class="note">' + esc(ex.note) + '</span>' : '';
-    return '<tr><td class="ex">' + esc(ex.name) + note + '</td>' +
+    var subs = [];
+    var he = hebrewName(ex);
+    if (he) subs.push(he);
+    if (ex.note) subs.push(ex.note);
+    var note = subs.length ? '<span class="note">' + subs.map(esc).join(' · ') + '</span>' : '';
+    return '<tr><td class="ex"><span dir="ltr">' + esc(displayName(ex)) + '</span>' + note + '</td>' +
       '<td class="wt">' + loadText(ex) + '</td></tr>';
   }).join('');
 }
@@ -150,6 +214,37 @@ function workoutCard(w, badgeText) {
   return badge +
     '<div class="date">אימון ' + esc(w.letter) + ' · ' + esc(weekdayHe(w.date)) + ' ' + fmtDate(w.date) + '</div>' +
     '<table>' + exerciseRows(w.exercises) + '</table>';
+}
+// Numeric value of one logged exercise: load (kg) if present, else reps.
+function exValue(ex) {
+  if (ex.load != null && ex.load !== '') return { v: Number(ex.load), unit: 'kg' };
+  if (ex.reps != null && ex.reps !== '') return { v: Number(ex.reps), unit: 'reps' };
+  return null;
+}
+function unitLabel(unit) { return unit === 'kg' ? 'ק״ג' : 'חזרות'; }
+function chartSVG(points) {
+  var W = 300, H = 96, PL = 10, PR = 10, PT = 22, PB = 22;
+  var vals = points.map(function (p) { return p.v; });
+  var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+  if (min === max) { min -= 1; max += 1; }
+  var pad = (max - min) * 0.2; min -= pad; max += pad;
+  function x(i) { return points.length === 1 ? W / 2 : PL + (W - PL - PR) * (i / (points.length - 1)); }
+  function y(v) { return PT + (H - PT - PB) * (1 - (v - min) / (max - min)); }
+  var line = points.map(function (p, i) {
+    return (i === 0 ? 'M' : 'L') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1);
+  }).join(' ');
+  var dots = points.map(function (p, i) {
+    return '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="4" fill="#c2410c"/>';
+  }).join('');
+  var labels = points.map(function (p, i) {
+    return '<text x="' + x(i).toFixed(1) + '" y="' + (y(p.v) - 8).toFixed(1) + '" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">' + esc(fmtNum(p.v)) + '</text>';
+  }).join('');
+  var dates = points.map(function (p, i) {
+    return '<text x="' + x(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.7">' + fmtDateShort(p.date) + '</text>';
+  }).join('');
+  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="גרף התקדמות">' +
+    '<path d="' + line + '" fill="none" stroke="#c2410c" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+    dots + labels + dates + '</svg>';
 }
 
 async function main() {
@@ -170,8 +265,12 @@ async function main() {
   }
   status.hidden = true;
 
-  // Next workout: opposite letter of the newest logged workout.
+  // Last workout only, with its latest weights.
   var last = workouts[0];
+  document.getElementById('last-card').innerHTML = workoutCard(last, null);
+  document.getElementById('last-section').hidden = false;
+
+  // Next workout: opposite letter of the newest logged workout.
   var nextLetter = last.letter === 'A' ? 'C' : 'A';
   var prevSame = (data.last_by_letter && data.last_by_letter[nextLetter]) || null;
   var nextCard = document.getElementById('next-card');
@@ -184,6 +283,54 @@ async function main() {
       '<p class="muted">אין עדיין אימון ' + esc(nextLetter) + ' מתועד — זו תהיה הפעם הראשונה.</p>';
   }
   document.getElementById('next-section').hidden = false;
+
+  // Per-exercise history + progress (all logged workouts, by date).
+  var byKey = {};
+  workouts.forEach(function (w) {
+    (w.exercises || []).forEach(function (ex) {
+      var k = canonKey(ex.name);
+      if (!k) return;
+      (byKey[k] = byKey[k] || []).push({ date: w.date, letter: w.letter, val: exValue(ex), note: ex.note || '' });
+    });
+  });
+  Object.keys(byKey).forEach(function (k) {
+    byKey[k].sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+  });
+  var progEl = document.getElementById('progress');
+  PROGRAM_ORDER.forEach(function (k) {
+    var obs = byKey[k];
+    var def = EXERCISES[k];
+    var div = document.createElement('div');
+    div.className = 'card prog-card';
+    var title = '<h3><span dir="ltr">' + esc(def.name) + '</span>' +
+      (def.he ? ' <span class="he">· ' + esc(def.he) + '</span>' : '') + '</h3>';
+    if (!obs || !obs.length) {
+      div.innerHTML = title + '<p class="muted">עדיין לא תועד באימון.</p>';
+      progEl.appendChild(div);
+      return;
+    }
+    var numeric = obs.filter(function (o) { return o.val; });
+    var html = title;
+    if (numeric.length) {
+      var unit = numeric[0].val.unit;
+      var first = numeric[0].val.v, lastV = numeric[numeric.length - 1].val.v;
+      var delta = Math.round((lastV - first) * 10) / 10;
+      html += '<p class="prog-line">' + esc(fmtNum(first)) + ' ← ' + esc(fmtNum(lastV)) + ' ' + esc(unitLabel(unit)) +
+        (numeric.length > 1 ? ' <span class="delta">(' + (delta >= 0 ? '+' : '') + esc(fmtNum(delta)) + ')</span>' : '') + '</p>';
+      html += chartSVG(numeric.map(function (o) { return { date: o.date, v: o.val.v }; }));
+    }
+    html += '<ul class="obs">' + obs.map(function (o) {
+      var valTxt = o.val
+        ? (o.val.unit === 'kg' ? esc(fmtNum(o.val.v)) + ' ק״ג' : '×' + esc(fmtNum(o.val.v)))
+        : '—';
+      var bits = [fmtDate(o.date) + ' · אימון ' + esc(o.letter) + ' — ' + valTxt];
+      if (o.note) bits.push(esc(o.note));
+      return '<li>' + bits.join(' · ') + '</li>';
+    }).join('') + '</ul>';
+    div.innerHTML = html;
+    progEl.appendChild(div);
+  });
+  document.getElementById('progress-section').hidden = false;
 
   // Last weights per letter.
   var lettersEl = document.getElementById('letters');
@@ -199,38 +346,12 @@ async function main() {
   });
   document.getElementById('letters-section').hidden = false;
 
-  // Deadlift progress (only workouts that logged a deadlift load).
-  var dl = workouts
-    .filter(function (w) {
-      return (w.exercises || []).some(function (ex) { return ex.name === 'דדליפט' && ex.load != null; });
-    })
-    .map(function (w) {
-      var ex = w.exercises.find(function (e) { return e.name === 'דדליפט'; });
-      return { date: w.date, letter: w.letter, load: ex.load };
-    })
-    .sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-  if (dl.length) {
-    var max = Math.max.apply(null, dl.map(function (d) { return d.load; }));
-    var first = dl[0].load, lastDl = dl[dl.length - 1].load;
-    var delta = Math.round((lastDl - first) * 10) / 10;
-    var html = '<p class="muted">' + esc(first) + ' ← ' + esc(lastDl) + ' ק״ג' +
-      (dl.length > 1 ? ' (' + (delta >= 0 ? '+' : '') + esc(delta) + ' ק״ג)' : '') + '</p>';
-    html += dl.map(function (d) {
-      var pct = max > 0 ? Math.round((d.load / max) * 100) : 0;
-      return '<div class="bar-row"><span class="lbl">אימון ' + esc(d.letter) + ' · ' + fmtDate(d.date) + '</span>' +
-        '<span class="bar-track"><span class="bar-fill" style="display:block;width:' + pct + '%"></span></span>' +
-        '<span class="bar-val">' + esc(d.load) + '</span></div>';
-    }).join('');
-    document.getElementById('deadlift').innerHTML = html;
-    document.getElementById('deadlift-section').hidden = false;
-  }
-
   // Full history, newest first.
   var histEl = document.getElementById('history');
-  workouts.forEach(function (w, i) {
+  workouts.forEach(function (w) {
     var div = document.createElement('div');
     div.className = 'card';
-    div.innerHTML = workoutCard(w, i === 0 ? 'האימון האחרון' : '');
+    div.innerHTML = workoutCard(w, null);
     histEl.appendChild(div);
   });
   document.getElementById('history-section').hidden = false;

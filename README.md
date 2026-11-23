@@ -8,9 +8,18 @@
 ## התוכנית הנוכחית
 
 - רק אימונים **A ו־C לסירוגין** — אין אימון B (אורן, 21/11/2026).
-- A, שני 16/11/2026: בק סקוואט 40, דדליפט 50, פול אפס גומייה ירוקה ×12,
-  דיפס גומייה ירוקה, גובלט סקוואט 12.
-- C, שישי 20/11/2026: דדליפט 52.2, חזה 50, חתירה 16, סוויפט 24.
+- שמות התרגילים הרשמיים מהדף של המועדון (אורן, 23/11/2026):
+  - A: Back Squat, Pull Ups, Deadlift, Dips, Goblet Squat.
+  - C: Deadlift, Bench Press, D.A.R Lunges, Double KB Row, KB Swing.
+  - B (לא מבוצע): Bench Press, Back Squat, 1ARM DB Row, RDL, Double DB Press.
+  - האתר מציג את השמות הרשמיים; שמות עבריים ישנים ב־KV ממופים באותה דרך
+    (`NAME_TO_KEY` ב־`index.html`), כך שההיסטוריה נשארת שלמה.
+- A, שני 16/11/2026: Back Squat 40, Deadlift 50, Pull Ups גומייה ירוקה ×12,
+  Dips גומייה ירוקה, Goblet Squat 12.
+- C, שישי 20/11/2026: Deadlift 52.2, Bench Press 50, Double KB Row 16,
+  KB Swing 24.
+- A, שני 23/11/2026: Back Squat 45, Deadlift 50, Pull Ups ×10.5 גומייה ירוק
+  זית, Dips גומייה ירוקה, Goblet Squat 16.
 
 > **שימו לב:** הקובץ `BACK_2_BASIC_3.0_WORKSHOP.xlsx` הוא **תוכנית אחרת**
 > (Back 2 Basic 3.0) — הוא לא נטען כאן, לא ב־`seed.json` ולא בשום מקום
