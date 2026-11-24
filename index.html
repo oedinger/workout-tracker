@@ -54,6 +54,8 @@
   .ex-load .unit { font-size: 12px; font-weight: 500; color: #57534a; }
   .spark { display: block; margin: 3px 0 0; color: #1c1a17; }
   @media (prefers-color-scheme: dark) { .spark { color: #f2ede3; } }
+  .spark-range { font-size: 12px; color: #57534a; margin-top: 1px; font-variant-numeric: tabular-nums; }
+  @media (prefers-color-scheme: dark) { .spark-range { color: #b3ab9c; } }
   #status { color: #57534a; }
   footer { color: #57534a; font-size: 13px; margin-top: 8px; }
   @media (prefers-color-scheme: dark) { footer, #status { color: #b3ab9c; } }
@@ -153,9 +155,10 @@ function exValue(ex) {
   if (ex.reps != null && ex.reps !== '') return { v: Number(ex.reps), unit: 'reps' };
   return null;
 }
-// Minimal sparkline: thin line, small dots, no axes, no labels.
+// Minimal sparkline: thin line with a soft area fill, small dots, no axes, no labels.
+// Smaller than before (26px tall) — the values read from the caption under it.
 function sparkSVG(points) {
-  var W = 300, H = 34, PL = 4, PR = 4, PT = 5, PB = 5;
+  var W = 300, H = 26, PL = 4, PR = 4, PT = 4, PB = 4;
   var vals = points.map(function (p) { return p.v; });
   var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
   if (min === max) { min -= 1; max += 1; }
@@ -165,12 +168,15 @@ function sparkSVG(points) {
   var line = points.map(function (p, i) {
     return (i === 0 ? 'M' : 'L') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1);
   }).join(' ');
+  var area = line + ' L' + x(points.length - 1).toFixed(1) + ' ' + (H - PB) + ' L' + x(0).toFixed(1) + ' ' + (H - PB) + ' Z';
   var dots = points.map(function (p, i) {
     var last = i === points.length - 1;
-    return '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="' + (last ? 3.5 : 2.5) + '" fill="#c2410c"/>';
+    var halo = last ? '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="6" fill="none" stroke="#c2410c" stroke-opacity="0.35" stroke-width="1.5"/>' : '';
+    return halo + '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="' + (last ? 3.5 : 2.5) + '" fill="#c2410c"/>';
   }).join('');
   return '<svg class="spark" direction="ltr" viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" role="img" aria-label="גרף היסטוריה">' +
-    '<path d="' + line + '" fill="none" stroke="#c2410c" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<path d="' + area + '" fill="#c2410c" fill-opacity="0.12"/>' +
+    '<path d="' + line + '" fill="none" stroke="#c2410c" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' +
     dots + '</svg>';
 }
 // All logged observations grouped by (letter, exercise), oldest first.
@@ -222,6 +228,11 @@ function letterCard(letter, lastW, hist) {
       '<span class="ex-load">' + (ex ? loadText(ex) : '—') + '</span></div>';
     if (numeric.length) {
       html += sparkSVG(numeric.map(function (o) { return { date: o.date, v: o.val.v }; }));
+      if (numeric.length > 1) {
+        var first = numeric[0].val.v, lastV = numeric[numeric.length - 1].val.v;
+        var unit = numeric[0].val.unit === 'kg' ? 'ק״ג' : 'חזרות';
+        html += '<div class="spark-range">' + esc(fmtNum(first)) + ' ← ' + esc(fmtNum(lastV)) + ' ' + esc(unit) + '</div>';
+      }
     }
     html += '</div>';
   });
