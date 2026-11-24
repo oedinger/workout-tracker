@@ -229,9 +229,17 @@ function letterCard(letter, lastW, hist) {
     if (numeric.length) {
       html += sparkSVG(numeric.map(function (o) { return { date: o.date, v: o.val.v }; }));
       if (numeric.length > 1) {
-        var first = numeric[0].val.v, lastV = numeric[numeric.length - 1].val.v;
-        var unit = numeric[0].val.unit === 'kg' ? 'ק״ג' : 'חזרות';
-        html += '<div class="spark-range">' + esc(fmtNum(first)) + ' ← ' + esc(fmtNum(lastV)) + ' ' + esc(unit) + '</div>';
+        var first = numeric[0], lastO = numeric[numeric.length - 1];
+        var unit = first.val.unit === 'kg' ? 'ק״ג' : 'חזרות';
+        // The note (e.g. the band) is part of the value: for Pull Ups a
+        // lighter band is progress even when the rep count drops, so the
+        // caption shows the band at each end instead of bare numbers.
+        function cap(o) {
+          var t = esc(fmtNum(o.val.v)) + ' ' + esc(unit);
+          if (o.note) t += ' (' + esc(o.note) + ')';
+          return t;
+        }
+        html += '<div class="spark-range">' + cap(first) + ' ← ' + cap(lastO) + '</div>';
       }
     }
     html += '</div>';
