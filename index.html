@@ -18,11 +18,14 @@
   @media (prefers-color-scheme: dark) {
     body { background: #16140f; color: #f2ede3; }
   }
-  .wrap { max-width: 560px; margin: 0 auto; padding: 20px 16px 48px; width: 100%; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; width: 100%; }
   header { margin-bottom: 16px; }
   h1 { font-size: 32px; line-height: 1.15; margin: 0 0 4px; }
   .sub { color: #57534a; font-size: 15px; margin: 0; }
   @media (prefers-color-scheme: dark) { .sub { color: #b3ab9c; } }
+  /* The two letter cards sit side by side in one row. */
+  #cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+  #cards .card { margin-bottom: 0; }
   .card {
     background: #fffdf9;
     border: 1px solid #d9d2c4;
@@ -43,7 +46,7 @@
   .ex-block { padding: 10px 0; border-top: 1px solid #d9d2c4; min-width: 0; }
   .ex-block:first-of-type { border-top: none; padding-top: 4px; }
   @media (prefers-color-scheme: dark) { .ex-block { border-top-color: #3a352b; } }
-  .ex-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .ex-head { display: flex; justify-content: space-between; gap: 4px 10px; align-items: baseline; flex-wrap: wrap; }
   .ex-name { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
   .ex-name .note { display: block; font-weight: 400; font-size: 13px; color: #57534a; }
   @media (prefers-color-scheme: dark) { .ex-name .note { color: #b3ab9c; } }
